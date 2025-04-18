@@ -9,7 +9,7 @@ account_id = "04631510c42a6977060d05d134c6d815"
 
 [[kv_namespaces]]
 binding = "catme"
-id = "b2a5b62020b24f63a351b96de548d6f7"
+id = "234ccb8aa8ff44b49094af9580071ee3"
 
 [build]
 command = "cargo install worker-build && worker-build --release"
