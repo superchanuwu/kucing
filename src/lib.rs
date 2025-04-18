@@ -1,6 +1,7 @@
 mod common;
 mod config;
 mod proxy;
+mod time;
 
 use crate::config::Config;
 use crate::proxy::*;
