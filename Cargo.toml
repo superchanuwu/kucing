@@ -29,8 +29,9 @@ once_cell = "1.21.3"
 js-sys = "0.3"
 wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
 trust-dns-proto = { version = "0.23", default-features = false }
+trust-dns-client = "0.19"  # Tambahkan dependensi trust-dns-client
 rand = { version = "0.8", default-features = false }
-
+futures = "0.3"  # Tambahkan dependensi futures jika belum ada
 [profile.release]
 opt-level = "s"
 lto = true
