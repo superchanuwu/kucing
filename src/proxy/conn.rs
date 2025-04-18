@@ -5,6 +5,8 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt, ReadBuf};
 use bytes::{BufMut, BytesMut};
 use futures_util::Stream;
 use pin_project_lite::pin_project;
+use futures_util::{AsyncRead, AsyncWrite};  // atau
+use tokio::io::{AsyncRead, AsyncWrite};
 use worker::*;
 use std::pin::Pin;
 use std::task::{Context, Poll};
