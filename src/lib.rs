@@ -111,7 +111,7 @@ fn link(_: Request, cx: RouteContext<Config>) -> Result<Response> {
 
     let vmess_link = {
         let config = json!({
-            "ps": "kirlia vmess",
+            "ps": "LCHAN vmess",
             "v": "2",
             "add": host,
             "port": "80",
