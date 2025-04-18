@@ -1,0 +1,29 @@
+name: Generate Cargo.lock
+
+on:
+  workflow_dispatch:
+
+jobs:
+  regenerate-lockfile:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Generate Cargo.lock
+        run: |
+          rm -f Cargo.lock
+          cargo generate-lockfile
+
+      - name: Commit and push Cargo.lock
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: regenerate Cargo.lock"
+          branch: main
