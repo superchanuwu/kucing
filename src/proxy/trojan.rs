@@ -1,7 +1,7 @@
 use tokio::io::AsyncReadExt;
 use super::ProxyStream;
 
-use worker::AsyncReadExt;
+use tokio::io::AsyncReadExt;
 use worker::*;
 
 impl <'a> ProxyStream<'a> {
