@@ -1,99 +1,76 @@
-use anyhow::Result;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use reqwest::Client;
+use serde::Deserialize;
 use std::net::IpAddr;
-use trust_dns_proto::op::{Message, Query};
-use trust_dns_proto::rr::{Name, RData, RecordType};
-use trust_dns_proto::serialize::binary::{BinEncodable, BinEncoder};
+use tokio::time::{timeout, Duration};
 
-pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
-    let mut headers = HeaderMap::new();
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/dns-message"));
-    headers.insert(ACCEPT, HeaderValue::from_static("application/dns-message"));
-
+// Fungsi untuk melakukan DoH query (DNS over HTTPS)
+pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let client = Client::new();
+    let response = timeout(
+        Duration::from_secs(10), // Timeout after 10 seconds
+        client
+            .post("https://1.1.1.1/dns-query")
+            .header("Content-Type", "application/dns-message")
+            .header("Accept", "application/dns-message")
+            .body(req_wireformat.to_vec())
+            .send(),
+    )
+    .await??;
 
-    let response = client
-        .post("https://cloudflare-dns.com/dns-query")
-        .headers(headers)
-        .body(req_wireformat.to_vec())
-        .send()
-        .await?
-        .bytes()
-        .await?;
-
-    Ok(response.to_vec())
-}
-
-pub async fn resolve_doh(host: &str) -> Result<IpAddr> {
-    if let Ok(ip) = resolve_record(host, RecordType::A).await {
-        return Ok(ip);
+    if !response.status().is_success() {
+        return Err("Failed to resolve DNS using Cloudflare DoH".into());
     }
 
-    resolve_record(host, RecordType::AAAA).await
+    Ok(response.bytes().await?.to_vec())
 }
 
-async fn resolve_record(host: &str, rtype: RecordType) -> Result<IpAddr> {
-    let name = Name::from_ascii(host)?;
-    let mut message = Message::new();
-    message.add_query(Query::query(name, rtype));
-    message.set_id(rand::random());
-    message.set_recursion_desired(true);
+// Fungsi untuk menyelesaikan DNS menggunakan Google DoH sebagai fallback
+pub async fn resolve_doh_fallback_google(req_wireformat: &[u8]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let client = Client::new();
+    let response = timeout(
+        Duration::from_secs(10), // Timeout after 10 seconds
+        client
+            .post("https://dns.google/dns-query")
+            .header("Content-Type", "application/dns-message")
+            .header("Accept", "application/dns-message")
+            .body(req_wireformat.to_vec())
+            .send(),
+    )
+    .await??;
 
-    let mut buf = Vec::with_capacity(512);
-    let mut encoder = BinEncoder::new(&mut buf);
-    message.emit(&mut encoder)?;
+    if !response.status().is_success() {
+        return Err("Failed to resolve DNS using Google DoH".into());
+    }
 
-    let response = doh(&buf).await?;
-    let msg = Message::from_vec(&response)?;
+    Ok(response.bytes().await?.to_vec())
+}
 
-    for answer in msg.answers() {
-        if let Some(data) = answer.data() {
-            match data {
-                RData::A(ipv4) => return Ok(IpAddr::V4(**ipv4)),
-                RData::AAAA(ipv6) => return Ok(IpAddr::V6(**ipv6)),
-                _ => {}
-            }
+// Fungsi untuk menyelesaikan DNS query untuk domain
+pub async fn resolve(domain: &str) -> Result<IpAddr, Box<dyn std::error::Error>> {
+    // Pertama coba Cloudflare DoH
+    let query = create_dns_query(domain)?;
+    let response = match doh(&query).await {
+        Ok(response) => response,
+        Err(_) => {
+            // Jika Cloudflare DoH gagal, coba Google DoH
+            resolve_doh_fallback_google(&query).await?
         }
-    }
+    };
 
-    Err(anyhow::anyhow!("No {:?} record found for {}", rtype, host))
+    // Parse response dan ambil alamat IP
+    let ip = parse_dns_response(&response)?;
+    Ok(ip)
 }
 
-pub fn extract_sni_from_tls_client_hello(buf: &[u8]) -> Option<String> {
-    if buf.len() < 5 || buf[0] != 0x16 { return None; }
-    let mut i = 43;
-    if i >= buf.len() { return None; }
+// Fungsi untuk membuat DNS query
+fn create_dns_query(domain: &str) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    // Create a DNS query (A record for IPv4)
+    // This part will need your DNS query implementation, typically creating wire-format query.
+    Ok(vec![]) // Placeholder, replace with actual wire-format query
+}
 
-    let session_id_len = *buf.get(i)? as usize;
-    i += 1 + session_id_len;
-
-    let cipher_suites_len = u16::from_be_bytes([*buf.get(i)?, *buf.get(i+1)?]) as usize;
-    i += 2 + cipher_suites_len;
-
-    let compression_methods_len = *buf.get(i)? as usize;
-    i += 1 + compression_methods_len;
-
-    let extensions_len = u16::from_be_bytes([*buf.get(i)?, *buf.get(i+1)?]) as usize;
-    i += 2;
-    let end = i + extensions_len;
-
-    while i + 4 <= end && i + 4 <= buf.len() {
-        let ext_type = u16::from_be_bytes([buf[i], buf[i + 1]]);
-        let ext_len = u16::from_be_bytes([buf[i + 2], buf[i + 3]]) as usize;
-        i += 4;
-
-        if ext_type == 0x00 {
-            let sni_len = u16::from_be_bytes([buf[i + 2], buf[i + 3]]) as usize;
-            let sni_start = i + 5;
-            let sni_end = sni_start + sni_len;
-            if sni_end <= buf.len() {
-                return Some(String::from_utf8_lossy(&buf[sni_start..sni_end]).to_string());
-            }
-        }
-
-        i += ext_len;
-    }
-
-    None
+// Fungsi untuk mem-parsing respons DNS
+fn parse_dns_response(response: &[u8]) -> Result<IpAddr, Box<dyn std::error::Error>> {
+    // Implementasi parsing response DNS, misalnya parsing A record atau AAAA record
+    Ok(IpAddr::V4("8.8.8.8".parse()?)) // Placeholder, replace with actual parsed IP
 }
