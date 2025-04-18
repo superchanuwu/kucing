@@ -1,10 +1,12 @@
-name: Generate Cargo.lock
+name: regenerate-lockfile
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'  # Tiap hari jam 10 pagi WIB
 
 jobs:
-  regenerate-lockfile:
+  regen-lockfile:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,13 +19,15 @@ jobs:
           toolchain: stable
           override: true
 
-      - name: Generate Cargo.lock
-        run: |
-          rm -f Cargo.lock
-          cargo generate-lockfile
+      - name: Remove existing Cargo.lock
+        run: rm -f Cargo.lock
+
+      - name: Regenerate Cargo.lock
+        run: cargo generate-lockfile
 
       - name: Commit and push Cargo.lock
         uses: stefanzweifel/git-auto-commit-action@v5
         with:
-          commit_message: "chore: regenerate Cargo.lock"
-          branch: main
+          commit_message: 'ci: regenerate Cargo.lock'
+          file_pattern: 'Cargo.lock'
+          repository: https://x-access-token:${{ secrets.GH_PAT }}@github.com/${{ github.repository }}
