@@ -15,7 +15,7 @@ use aes_gcm::{
 };
 use md5::{Digest, Md5};
 use sha2::Sha256;
-use worker::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use worker::*;
 
 
