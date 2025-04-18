@@ -1,14 +1,14 @@
-name = "gaming"
+name = "catme"
 type = "rust"
 main = "build/worker/shim.mjs"
 compatibility_date = "2024-05-23"
 minify = true
 usage_model = "bundled"
 
-account_id = "#04631510c42a6977060d05d134c6d815"
+account_id = "04631510c42a6977060d05d134c6d815"
 
 [[kv_namespaces]]
-binding = "gaming"
+binding = "catme"
 id = "b2a5b62020b24f63a351b96de548d6f7"
 
 [build]
