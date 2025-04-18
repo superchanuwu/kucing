@@ -1,0 +1,75 @@
+use anyhow::{Result, anyhow};
+use wasm_bindgen::prelude::*;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{window, Response};
+use js_sys::Promise;
+use trust_dns_proto::op::{Message, Query};
+use trust_dns_proto::rr::{Name, RData, RecordType};
+use trust_dns_proto::serialize::binary::{BinEncodable, BinEncoder};
+
+// Fungsi utama untuk melakukan DNS resolution menggunakan DoH dan DNS wire format
+#[wasm_bindgen]
+pub async fn resolve_doh(host: &str) -> Result<String> {
+    // Mencoba untuk menyelesaikan DNS query menggunakan DoH
+    resolve_record_wire_format(host, RecordType::A).await.or_else(|_| {
+        resolve_record_wire_format(host, RecordType::AAAA).await
+    })
+}
+
+// Fungsi untuk menyelesaikan record DNS menggunakan DoH dan DNS wire format
+async fn resolve_record_wire_format(host: &str, rtype: RecordType) -> Result<String> {
+    let name = Name::from_ascii(host)?;
+
+    // Membangun query DNS dalam format wire (binary)
+    let mut message = Message::new();
+    message.add_query(Query::query(name, rtype));
+    message.set_id(rand::random());
+    message.set_recursion_desired(true);
+
+    // Menyusun query DNS ke dalam wire format (binary format)
+    let mut buf = Vec::with_capacity(512);
+    let mut encoder = BinEncoder::new(&mut buf);
+    message.emit(&mut encoder)?;
+
+    // Mengirim query DoH menggunakan fetch() ke server Cloudflare
+    let response = doh_wire_format(&buf).await?;
+    let msg = Message::from_vec(&response)?;
+
+    // Memeriksa hasil dan mengembalikan hasilnya sesuai tipe record
+    for answer in msg.answers() {
+        if let Some(data) = answer.data() {
+            match data {
+                RData::A(ipv4) => return Ok(ipv4.to_string()),  // Mengembalikan IPv4
+                RData::AAAA(ipv6) => return Ok(ipv6.to_string()), // Mengembalikan IPv6
+                _ => {}
+            }
+        }
+    }
+
+    Err(anyhow!("No record found for {}", host))
+}
+
+// Fungsi untuk mengirimkan query DoH menggunakan fetch() dengan DNS wire format
+async fn doh_wire_format(req_wireformat: &[u8]) -> Result<Vec<u8>> {
+    let url = "https://cloudflare-dns.com/dns-query"; // Cloudflare DoH server
+
+    let response = fetch_doh(url, req_wireformat).await?;
+    Ok(response)
+}
+
+// Fungsi untuk melakukan DoH menggunakan fetch() dengan DNS wire format
+async fn fetch_doh(url: &str, req_wireformat: &[u8]) -> Result<Vec<u8>> {
+    let window = window().ok_or_else(|| anyhow!("Failed to get window object"))?;
+    let fetch_promise = window.fetch_with_str(url);
+
+    // Menyusun request body dengan method POST
+    let mut request = js_sys::Object::new();
+    js_sys::Reflect::set(&request, &"body".into(), &JsValue::from(req_wireformat))?;
+    js_sys::Reflect::set(&request, &"method".into(), &"POST".into())?;
+
+    // Mengirimkan request dan menunggu respons
+    let response: Response = JsFuture::from(fetch_promise).await?.into();
+    let bytes = response.array_buffer().await.map_err(|e| anyhow!("Failed to get array buffer: {:?}", e))?;
+
+    Ok(bytes.to_vec()) // Mengembalikan hasil response
+}
