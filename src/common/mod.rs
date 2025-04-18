@@ -1,8 +1,8 @@
 pub mod hash;
 
 use std::net::{Ipv4Addr, Ipv6Addr};
-use worker::AsyncReadExt; // dari worker crate
-use worker::AsyncRead;     // untuk trait
+use tokio::io::AsyncReadExt; // dari worker crate
+use tokio::io::AsyncRead;     // untuk trait
 use worker::*;
 
 pub const KDFSALT_CONST_VMESS_HEADER_PAYLOAD_LENGTH_AEAD_KEY: &[u8] =
