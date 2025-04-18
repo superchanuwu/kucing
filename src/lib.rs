@@ -53,7 +53,7 @@ async fn sub(_: Request, cx: RouteContext<Config>) -> Result<Response> {
 async fn tunnel(req: Request, mut cx: RouteContext<Config>) -> Result<Response> {
     let mut proxyip = cx.param("proxyip").unwrap().to_string();
     if proxyip.len() == 2 {
-        let kv = cx.kv("gaming")?;
+        let kv = cx.kv("catme")?;
         let mut proxy_kv_str = kv.get("proxy_kv").text().await?.unwrap_or("".to_string());
 
         if proxy_kv_str.len() == 0 {
