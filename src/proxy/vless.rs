@@ -1,6 +1,6 @@
 use super::ProxyStream;
 
-use worker::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use uuid::Uuid;
 use worker::*;
 
