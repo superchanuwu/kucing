@@ -1,101 +1,78 @@
-use anyhow::{Result, Context};
+use anyhow::{Result, anyhow};
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 use reqwest::Client;
 use serde::Deserialize;
+use std::net::Ipv4Addr;
 
-#[derive(Deserialize, Debug)]
+pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/dns-message"),
+    );
+    headers.insert(ACCEPT, HeaderValue::from_static("application/dns-message"));
+    
+    let client = Client::new();
+    let response = client
+        .post("https://1.1.1.1/dns-query")
+        .headers(headers)
+        .body(req_wireformat.to_vec())
+        .send()
+        .await
+        .context("Failed to send DNS request")?
+        .bytes()
+        .await
+        .context("Failed to read DNS response")?;
+
+    Ok(response.to_vec())
+}
+
+#[derive(Deserialize)]
+struct DoHAnswer {
+    Answer: Option<Vec<DNSAnswer>>,
+}
+
+#[derive(Deserialize)]
 struct DNSAnswer {
     data: String,
 }
 
-#[derive(Deserialize, Debug)]
-struct DoHResponse {
-    Answer: Option<Vec<DNSAnswer>>,
-}
+pub async fn resolve(domain: &str) -> Result<String> {
+    let url = format!(
+        "https://dns.google/resolve?name={}&type=A",
+        domain
+    );
 
-fn process_wire_format(req_wireformat: &[u8]) -> Result<Vec<u8>> {
-    // Misalnya, kita ingin memproses data byte dengan menambahkan beberapa byte (contoh)
-    let mut processed_data = req_wireformat.to_vec();  // Mengubah slice ke Vec<u8>
-
-    // Contoh proses: Menambahkan byte tambahan pada akhir data (untuk demonstrasi)
-    processed_data.push(0x00); // Menambahkan byte nol
-
-    Ok(processed_data)
-}
-
-fn fetch_dns_data(url: &str) -> Result<Vec<u8>> {
     let client = Client::new();
-    let mut headers = HeaderMap::new();
-    headers.insert(ACCEPT, HeaderValue::from_static("application/json"));
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    let resp = client.get(&url).send().await?.text().await?;
 
-    // Mengirimkan permintaan GET dan mengembalikan data dalam bentuk raw bytes (Vec<u8>)
-    let response = client
-        .get(url)
-        .headers(headers)
-        .send()
-        .context("Failed to send DNS request")?;
+    let parsed: DoHAnswer = serde_json::from_str(&resp)
+        .context("Failed to parse DNS response for A record")?;
 
-    if response.status().is_success() {
-        let body = response.bytes().context("Failed to read DNS response as bytes")?;
-        Ok(body.to_vec()) // Mengembalikan body sebagai Vec<u8>
-    } else {
-        Err(anyhow::anyhow!("DNS Request failed with status: {}", response.status()).into())
-    }
-}
-
-fn fetch_http_request(url: &str) -> Result<Vec<u8>> {
-    let client = Client::new();
-    let response = client
-        .get(url)
-        .send()
-        .context("Failed to send HTTP request")?;
-
-    if response.status().is_success() {
-        let body = response.bytes().context("Failed to read HTTP response as bytes")?;
-        Ok(body.to_vec()) // Mengembalikan body sebagai Vec<u8>
-    } else {
-        Err(anyhow::anyhow!("HTTP Request failed with status: {}", response.status()).into())
-    }
-}
-
-fn main() -> Result<()> {
-    // DNS over HTTPS URL
-    let dns_url = "https://dns.google/resolve?name=example.com&type=A";
-    
-    // Mengambil data DNS dari URL sebagai raw bytes
-    let body = fetch_dns_data(dns_url)?;
-
-    // Menampilkan body dari respons DNS sebagai raw bytes
-    println!("DNS Response body (raw bytes): {:?}", body);
-
-    // Memproses data wireformat (misalnya menambahkan byte tambahan pada akhir)
-    let processed_data = process_wire_format(&body)?;
-    println!("Processed DNS data: {:?}", processed_data);
-
-    // Parsing JSON ke dalam struktur Rust untuk DNS
-    let body_str = String::from_utf8_lossy(&body);  // Mengubah raw bytes menjadi string untuk parsing JSON
-    let parsed: DoHResponse = serde_json::from_str(&body_str)
-        .context("Failed to parse DNS response body as JSON")?;
-
-    // Memeriksa dan menampilkan hasil DNS
     if let Some(answers) = parsed.Answer {
         for ans in answers {
-            println!("IP Address from DNS: {}", ans.data);
+            if let Ok(ip) = ans.data.parse::<Ipv4Addr>() {
+                return Ok(ip.to_string());
+            }
         }
-    } else {
-        println!("No DNS answers found.");
     }
 
-    // HTTP Request URL
-    let http_url = "https://httpbin.org/get";
-    
-    // Mengambil data dari HTTP request sebagai raw bytes
-    let http_response = fetch_http_request(http_url)?;
+    // Jika A record gagal, coba resolve AAAA
+    let url_aaaa = format!(
+        "https://dns.google/resolve?name={}&type=AAAA",
+        domain
+    );
+    let resp_aaaa = client.get(&url_aaaa).send().await?.text().await?;
+    let parsed_aaaa: DoHAnswer = serde_json::from_str(&resp_aaaa)
+        .context("Failed to parse DNS response for AAAA record")?;
 
-    // Menampilkan body dari respons HTTP sebagai string (untuk debugging)
-    let http_body_str = String::from_utf8_lossy(&http_response);
-    println!("HTTP Response body (raw bytes): {}", http_body_str);
+    if let Some(answers) = parsed_aaaa.Answer {
+        for ans in answers {
+            if let Ok(ip) = ans.data.parse::<std::net::Ipv6Addr>() {
+                return Ok(ip.to_string());
+            }
+        }
+    }
 
-    Ok(())
+    Err(anyhow!("resolve: no valid A or AAAA record found"))
 }
