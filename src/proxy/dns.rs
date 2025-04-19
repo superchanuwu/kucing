@@ -14,11 +14,12 @@ struct DoHResponse {
 }
 
 fn process_wire_format(req_wireformat: &[u8]) -> Result<Vec<u8>> {
-    // Proses data byte, misalnya mengonversi slice ke Vec<u8>
-    // Contoh ini hanya menyalin data ke dalam Vec<u8>
-    let processed_data: Vec<u8> = req_wireformat.to_vec();
+    // Misalnya, kita ingin memproses data byte dengan menambahkan beberapa byte (contoh)
+    let mut processed_data = req_wireformat.to_vec();  // Mengubah slice ke Vec<u8>
 
-    // Kembalikan hasil pemrosesan
+    // Contoh proses: Menambahkan byte tambahan pada akhir data (untuk demonstrasi)
+    processed_data.push(0x00); // Menambahkan byte nol
+
     Ok(processed_data)
 }
 
@@ -35,7 +36,6 @@ fn fetch_dns_data(url: &str) -> Result<Vec<u8>> {
         .send()
         .context("Failed to send DNS request")?;
 
-    // Memeriksa status dari response dan mengambil body sebagai byte array
     if response.status().is_success() {
         let body = response.bytes().context("Failed to read DNS response as bytes")?;
         Ok(body.to_vec()) // Mengembalikan body sebagai Vec<u8>
@@ -69,7 +69,7 @@ fn main() -> Result<()> {
     // Menampilkan body dari respons DNS sebagai raw bytes
     println!("DNS Response body (raw bytes): {:?}", body);
 
-    // Memproses data wireformat (menyalin data ke Vec<u8>)
+    // Memproses data wireformat (misalnya menambahkan byte tambahan pada akhir)
     let processed_data = process_wire_format(&body)?;
     println!("Processed DNS data: {:?}", processed_data);
 
