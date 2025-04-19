@@ -1,5 +1,6 @@
 use anyhow::{Result, Context};
-use reqwest::{blocking::Client, header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE}};
+use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE}};
+use reqwest::Client;
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
