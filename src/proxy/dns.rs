@@ -1,4 +1,3 @@
-
 use anyhow::Result;
 use worker::fetch;
 use worker::*; // Cloudflare Workers crate
@@ -7,9 +6,13 @@ use serde::Deserialize;
 pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
     let url = "https://1.1.1.1/dns-query";
 
-    let request = Request::new(url, "POST", Some(req_wireformat.to_vec()), None);
-    let response = fetch(request).await?.bytes().await?;
-
+    // Request with proper arguments (only URL and HTTP method)
+    let request = Request::new(url, "POST")?;
+    let mut req = request.clone();
+    req.body(Some(req_wireformat.to_vec()))?;
+    
+    // Use fetch to perform the request
+    let response = fetch(req).await?.bytes().await?;
     Ok(response.to_vec())
 }
 
@@ -19,7 +22,7 @@ pub async fn resolve(domain: &str) -> Result<String> {
         domain
     );
 
-    let request = Request::new(&url, "GET", None, None);
+    let request = Request::new(&url, "GET")?;
     let resp = fetch(request).await?.text().await?;
 
     #[derive(Deserialize)]
@@ -46,7 +49,7 @@ pub async fn resolve(domain: &str) -> Result<String> {
         "https://dns.google/resolve?name={}&type=AAAA",
         domain
     );
-    let request_aaaa = Request::new(&url_aaaa, "GET", None, None);
+    let request_aaaa = Request::new(&url_aaaa, "GET")?;
     let resp_aaaa = fetch(request_aaaa).await?.text().await?;
 
     let parsed_aaaa: DoHAnswer = serde_json::from_str(&resp_aaaa)?;
