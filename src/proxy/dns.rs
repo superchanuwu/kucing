@@ -1,5 +1,6 @@
 
 use anyhow::Result;
+use worker::fetch;
 use worker::*; // Cloudflare Workers crate
 use serde::Deserialize;
 
