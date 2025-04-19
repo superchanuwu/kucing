@@ -1,4 +1,3 @@
-
 use crate::config::Config;
 use crate::dns::resolve;
 use std::pin::Pin;
@@ -30,12 +29,12 @@ impl<'a> ProxyStream<'a> {
             events,
         }
     }
-    
+
     // Fungsi untuk menjaga koneksi WebSocket tetap hidup dengan mengirimkan ping secara periodik
     pub async fn keep_alive(&mut self) {
         loop {
             sleep(Duration::from_secs(30)).await;
-            if let Err(e) = self.ws.ping().await {
+            if let Err(e) = self.ws.send_with_bytes(b"ping").await {
                 console_error!("Ping gagal: {}", e);
                 break;
             }
