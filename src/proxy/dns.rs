@@ -28,7 +28,7 @@ pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
             .await
             .context("Failed to read DNS response")?;
 
-        if response.len() > 0 {
+        if !response.is_empty() {
             return Ok(response.to_vec());
         } else {
             console_error!("Received empty response, retrying...");
