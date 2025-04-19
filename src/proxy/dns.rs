@@ -1,3 +1,4 @@
+use crate::_worker_fetch::fetch;
 use worker::*; // Mengimpor semua API dari worker, termasuk fetch
 use anyhow::Result;
 use serde::Deserialize;
