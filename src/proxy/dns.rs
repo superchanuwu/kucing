@@ -45,7 +45,7 @@ pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
 
 #[derive(Deserialize)]
 struct DoHAnswer {
-    answer: Option<Vec<DNSAnswer>>, // Mengganti Answer menjadi answer
+    Answer: Option<Vec<DNSAnswer>>, // Mengganti Answer menjadi answer
 }
 
 #[derive(Deserialize)]
@@ -65,7 +65,7 @@ pub async fn resolve(domain: &str) -> Result<String> {
     let parsed: DoHAnswer = serde_json::from_str(&resp)
         .context("Failed to parse DNS response for A record")?;
 
-    if let Some(answers) = parsed.answer {  // Mengganti Answer menjadi answer
+    if let Some(answers) = parsed.Answer {  // Mengganti Answer menjadi answer
         for ans in answers {
             if let Ok(ip) = ans.data.parse::<Ipv4Addr>() {
                 return Ok(ip.to_string());
@@ -82,7 +82,7 @@ pub async fn resolve(domain: &str) -> Result<String> {
     let parsed_aaaa: DoHAnswer = serde_json::from_str(&resp_aaaa)
         .context("Failed to parse DNS response for AAAA record")?;
 
-    if let Some(answers) = parsed_aaaa.answer {  // Mengganti Answer menjadi answer
+    if let Some(answers) = parsed_aaaa.Answer {  // Mengganti Answer menjadi answer
         for ans in answers {
             if let Ok(ip) = ans.data.parse::<std::net::Ipv6Addr>() {
                 return Ok(ip.to_string());
