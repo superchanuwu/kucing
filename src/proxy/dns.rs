@@ -5,6 +5,9 @@ use serde::Deserialize;
 use std::net::Ipv4Addr;
 use tokio::time::{sleep, Duration};
 
+// Pastikan impor console_error sudah benar
+use worker::console_error;
+
 pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
     let mut headers = HeaderMap::new();
     headers.insert(
