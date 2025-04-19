@@ -1,17 +1,16 @@
-
-use worker::*; // Cloudflare Workers crate
+use worker::*; // Mengimpor semua API dari worker, termasuk fetch
 use anyhow::Result;
 use serde::Deserialize;
 
 pub async fn doh(req_wireformat: &[u8]) -> Result<Vec<u8>> {
     let url = "https://1.1.1.1/dns-query";
 
-    // Create request with correct arguments (only URL and HTTP method)
-    let request = Request::new(url, Method::Post)?;
+    // Membuat request dengan argumen yang benar (URL dan HTTP method)
+    let request = Request::new(url, Method::Post)?; // Gunakan Method::Post
     let mut req = request.clone();
     req.body(Some(req_wireformat.to_vec()))?;
 
-    // Use fetch to perform the request
+    // Gunakan fetch untuk melakukan request
     let response = fetch(req).await?.bytes().await?;
     Ok(response.to_vec())
 }
@@ -22,8 +21,8 @@ pub async fn resolve(domain: &str) -> Result<String> {
         domain
     );
 
-    // Send the GET request for DNS resolution
-    let request = Request::new(&url, Method::Get)?;
+    // Kirim request GET untuk resolusi DNS
+    let request = Request::new(&url, Method::Get)?; // Gunakan Method::Get
     let resp = fetch(request).await?.text().await?;
 
     #[derive(Deserialize)]
@@ -45,12 +44,12 @@ pub async fn resolve(domain: &str) -> Result<String> {
         }
     }
 
-    // Attempt to resolve AAAA if A fails
+    // Coba resolusi AAAA jika A gagal
     let url_aaaa = format!(
         "https://dns.google/resolve?name={}&type=AAAA",
         domain
     );
-    let request_aaaa = Request::new(&url_aaaa, Method::Get)?;
+    let request_aaaa = Request::new(&url_aaaa, Method::Get)?; // Gunakan Method::Get
     let resp_aaaa = fetch(request_aaaa).await?.text().await?;
 
     let parsed_aaaa: DoHAnswer = serde_json::from_str(&resp_aaaa)?;
